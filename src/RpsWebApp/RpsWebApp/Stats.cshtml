@@ -1,0 +1,24 @@
+﻿@using RpsPositionWebApp.Data
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <title></title>
+    
+</head>
+<body>
+    <div class="form-group">
+        <label class="control-label">Client Connections:</label>
+        <p class="form-control-static">@ClientManager.Instance.ConnectedIds.Count()</p>
+    </div>
+    <div class="form-group">
+        <label class="control-label">Inbound Vehicle Event Queue:</label>
+        <p class="form-control-static">@VehicleEventQueue.Instance.Count</p>
+    </div>
+    @foreach (var adapter in DataProviderManager.Instance.PositionAdapters) {
+    <div class="form-group">
+        <label class="control-label">Total Processed Messages:</label>
+        <p class="form-control-static">@adapter.TotalProcessedMessages</p>
+    </div>
+    }
+</body>
+</html>

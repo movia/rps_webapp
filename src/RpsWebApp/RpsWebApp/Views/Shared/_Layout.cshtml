@@ -1,0 +1,54 @@
+﻿@{
+    //Page.MobileAppCapable = false;
+}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>@Page.Title</title>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+    <link href="~/content/bootstrap.min.css" rel="stylesheet" />
+    <link href="~/content/stylesheet.min.css" rel="stylesheet" />
+    @RenderSection("AdditionalPageHead", required: false)
+</head>
+<body>
+    <nav class="navbar navbar-default navbar-fixed-top" role="navigation">
+        <div class="container-fluid">
+            
+            @if (!Page.MobileAppCapable) {
+                <div class="pull-right">
+                    <a href="#" id="tick" class="btn btn-default">Settings</a>
+                </div>
+                <div class="pull-left visible-xs">
+                    <button type="button" class="btn btn-default" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1">
+                        Menu
+                    </button>                
+                </div>
+                <!-- Collect the nav links, forms, and other content for toggling -->
+                <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+                    <ul class="nav navbar-nav">
+                        <li class="active"><a href="~/LiveMap">Live Map</a></li>
+                    </ul>
+                </div>
+            }
+            else
+            {
+                <div class="navbar-header">
+                    <a class="navbar-brand" href="#">Vehicle Tracker</a>
+                </div>
+            }
+        </div>
+    </nav>
+    @RenderBody()
+    <script src="~/scripts/jquery-2.1.4.min.js"></script>
+    <script src="~/scripts/bootstrap.min.js"></script>
+    @RenderSection("AdditionalPageScript", required: false)
+    <script>
+        $("#tick").click(function (e) {
+            e.preventDefault();
+            $(".sidebarnav").toggleClass("sidebarnav-toggled");
+        });
+    </script>
+</body>
+</html>

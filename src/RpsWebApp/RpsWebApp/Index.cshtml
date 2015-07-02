@@ -1,0 +1,275 @@
+﻿@{
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    Page.Title = "Vehicle Test Client";
+    Page.MobileAppCapable = true;
+}
+
+@section AdditionalPageHead {
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+}
+
+<div class="container">
+    <h3>Vehicle</h3>
+    <div class="form-group">
+        <label class="control-label">Vehicle:</label>
+        <select id="vehicleId" class="form-control">
+            <option value="7169">7169</option>
+            <option value="9031200002407190">7190</option>
+        </select>
+    </div>
+
+    <h3>Journey</h3>
+    <div class="form-group">
+        <label class="control-label">Line:</label>
+        <select id="lineNumber" class="form-control">
+        </select>
+    </div>
+    <div class="form-group">
+        <label class="control-label">Journey:</label>
+        <select id="journeyNumber" class="form-control">
+            <option value="">(Select)</option>
+        </select>
+    </div>
+    <div class="form-group">
+        <label class="control-label">Journey Id:</label>
+        <input id="journeyId" class="form-control" />
+    </div>
+
+    <h3>Status</h3>
+    <div id="info" class="alert alert-info"></div>
+
+    <h3>Tracking</h3>
+    <div class="">
+        <button id="startTrackingButton" class="btn btn-primary">Start</button>
+        <button id="stopTrackingButton" class="btn btn-primary">Stop</button>
+    </div>
+
+    <p></p>
+</div>
+
+@section AdditionalPageScript {
+<script src="~/scripts/jquery.signalr-2.2.0.min.js"></script>
+<script src="~/signalr/hubs"></script>
+<script>
+    var assignmentEndpoint = "@(Request.ApplicationPath + (Request.ApplicationPath.EndsWith("/") ? "" : "/"))wsi/assignment/v1/"
+
+    var vehicleEventsProxy = null;
+    var watchHandle = null;
+    var trackHandle = null;
+    var vehicleId = null;
+    var position = null;
+    var lines = null;
+    var journeys = null;
+    var journeyId = null;
+
+    var geolocationOptions = {
+        maximumAge: 1000, 
+        //timeout: 5000, 
+        enableHighAccuracy: true
+    }
+
+    function updateLine() {
+
+        /* Do not update line, if we have no position, or are currently tracking. */
+        if (position == null || trackHandle != null) {
+            $('#lineNumber').empty();
+            $('#lineNumber').append($('<option>(Select)</option>'));
+            $('#lineNumber').prop('disabled', true);
+            return;
+        }
+
+        vehicleId = $('#vehicleId').val();
+
+        jQuery.getJSON(assignmentEndpoint + vehicleId + "@@" + position.coords.latitude + "," + position.coords.longitude + "/lines", function (data) {
+            lines = data;
+            $('#lineNumber').empty();
+            $('#lineNumber').append($('<option>(Select)</option>'));
+            for (i in lines) {
+                line = data[i];
+                $('#lineNumber').append($('<option></option>').attr('value', line.number).text(line.designation));
+            }
+            $('#lineNumber').prop('disabled', false);
+        })
+
+    }
+
+    function updateJourney() {
+
+        /* Do not update line, if we have no position, or are currently tracking. */
+        if (position == null || trackHandle != null) {
+            $('#journeyNumber').empty();
+            $('#journeyNumber').append($('<option>(Select)</option>'));
+            $('#journeyNumber').prop('disabled', true);
+            return;
+        }
+        vehicleId = $('#vehicleId').val();
+        var lineNumber = $('#lineNumber').val();
+
+        jQuery.getJSON(assignmentEndpoint + vehicleId + "@@" + position.coords.latitude + "," + position.coords.longitude + "/lines/" + lineNumber + '/journeys')
+            .success(function (data) {
+                journeys = data;
+                $('#journeyNumber').empty();
+                $('#journeyNumber').append($('<option>(Select)</option>'));
+                for (i in journeys) {
+                    journey = data[i];
+                    $('#journeyNumber').append($('<option></option>').attr('value', journey.id).text(journey.number + ' mod ' + journey.destination + ' (' + (journey.score * 100).toFixed(1) + '%)'));
+                }
+                $('#journeyNumber').prop('disabled', false);
+            })
+            .fail(function ($xhr) {
+                data = JSON.parse($xhr.responseText);
+                alert(data.message);
+            })
+    }
+
+    function selectJourney() {
+        $('#journeyId').val($('#journeyNumber').val());
+    }
+
+    function showPosition() {
+        $('#info').empty();
+
+        if (position != null) {
+            $('#info').append(
+                "Timestamp: " + position.timestamp + '<br />' +
+                'Time:' + new Date(position.timestamp).toUTCString() + '<br />' +
+                "Latitude: " + position.coords.latitude + '<br />' +
+                "Longitude: " + position.coords.longitude + '<br />' +
+                "Accuracy: " + position.coords.accuracy + '<br />');
+        }
+    }
+
+    function openConnection() {
+        $.connection.hub.start().done(function () {
+            console.info('SignalR connection etablished.');
+            $('#startTrackingButton').prop('disabled', trackHandle != null);
+        });
+    }
+
+    function locationChanged(p) {
+        position = p;
+
+        if (lines == null)
+            updateLine();
+
+        showPosition();
+    }
+
+    function startTracking() {
+
+        console.info('Starting tracking ...')
+
+        if (trackHandle != null)
+            clearInterval(trackHandle);
+
+        vehicleId = $('#vehicleId').val();
+        journeyId = $('#journeyId').val();
+
+
+        var vehicleAssignment = {
+            vehicleId: vehicleId,
+            journeyId: journeyId,
+            acceptedDateTime: new Date(),
+        };
+        console.info('Assignment event occured:', vehicleAssignment);
+        vehicleEventsProxy.server.vehicleAssignment(vehicleAssignment);
+
+        trackHandle = setInterval(track, 1000);
+
+        /* Update UI */
+        $('#startTrackingButton').prop('disabled', true);
+        $('#stopTrackingButton').prop('disabled', false);
+        $('#lineNumber').prop('disabled', true);
+        $('#journeyNumber').prop('disabled', true);
+        $('#journeyId').prop('disabled', true);
+    }
+
+    function stopTracking() {
+
+        console.info('Stopping tracking ...')
+
+        if (trackHandle != null)
+            clearInterval(trackHandle);
+        trackHandle = null;
+
+        /* Update UI */
+        $('#startTrackingButton').prop('disabled', false);
+        $('#stopTrackingButton').prop('disabled', true);
+        $('#lineNumber').prop('disabled', false);
+        $('#journeyNumber').prop('disabled', false);
+        $('#journeyId').prop('disabled', false);
+
+        updateLine();
+    }
+
+    function track() {
+
+        if (position == null) {
+            if ($('#info').hasClass('alert-info') || $('#info').hasClass('alert-warning')) {
+                $('#info').removeClass('alert-info').removeClass('alert-warning').addClass('alert-danger')
+            }
+            return;
+        }
+
+        if (new Date().getTime() - position.timestamp > 2000) {
+            navigator.geolocation.getCurrentPosition(locationChanged, null, geolocationOptions);
+
+            if ($('#info').hasClass('alert-info') || $('#info').hasClass('alert-danger')) {
+                $('#info').removeClass('alert-info').removeClass('alert-danger').addClass('alert-warning')
+            }
+        }
+        else if ($('#info').hasClass('alert-warning') || $('#info').hasClass('alert-danger')) {
+            $('#info').removeClass('alert-warning').removeClass('alert-danger').addClass('alert-info')
+        }
+
+        var vehiclePosition = {
+            vehicleId: vehicleId,
+            timestamp: position.timestamp,
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+            accuracy: position.coords.accuracy
+        };
+        console.info('Tracking event occured:', position);
+        vehicleEventsProxy.server.vehiclePosition(vehiclePosition);
+    }
+
+    $(function () {
+        $('#startTrackingButton').click(function () {
+            startTracking();
+        });
+
+        $('#stopTrackingButton').click(function () {
+            stopTracking();
+        });
+
+        $('#startTrackingButton').prop('disabled', true);
+        $('#stopTrackingButton').prop('disabled', true);
+        $('#lineNumber').prop('disabled', true);
+        $('#journeyNumber').prop('disabled', true);
+
+        vehicleEventsProxy = $.connection.vehicleEvents
+
+        $.extend(vehicleEventsProxy.client, {
+            someMethod: function () { }
+        });
+
+        $.connection.hub.disconnected(function () {
+            console.warn('SignalR connection lost.');
+            $('#startTrackingButton').prop('disabled', true);
+
+            setTimeout(function () {
+                console.info('SignalR connection reconnecting.');
+                openConnection();
+            }, 5000); // Restart connection after 5 seconds.
+        });
+
+        openConnection();
+        watchHandle = navigator.geolocation.watchPosition(locationChanged, null, geolocationOptions);
+        
+        $('#lineNumber').change(updateJourney);
+        $('#journeyNumber').change(selectJourney);
+
+    });
+</script>
+}
