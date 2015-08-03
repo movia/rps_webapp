@@ -11,8 +11,6 @@ namespace RpsPositionWebApp.DataProviders.Rps
 {
     public class MessageConverter
     {
-        internal UInt16 sequenceNumber = 0;
-
         internal static string ByteArrayToHexViaLookup(byte[] bytes)
         {
             /* Best performance convertion by http://stackoverflow.com/questions/311165/how-do-you-convert-byte-array-to-hexadecimal-string-and-vice-versa */
@@ -42,6 +40,14 @@ namespace RpsPositionWebApp.DataProviders.Rps
             return result.ToString();
         }
 
+        private ConfigurationManager config;
+        internal ushort sequenceNumber = 0;
+
+        public MessageConverter()
+        {
+            config = ConfigurationManager.Instance;
+        }
+
         public byte[] VehiclePositionReport(VehiclePositionEvent vehiclePositionEvent)
         {
             using (var stream = new MemoryStream())
@@ -50,12 +56,20 @@ namespace RpsPositionWebApp.DataProviders.Rps
                 writer.Write((byte)2);
                 writer.Write((byte)127);
 
+                var deviceId = config.Configuration.Get("vehicles:" + vehiclePositionEvent.VehicleId + ":deviceId");
+                var deviceIdParts = deviceId.Split('-');
 
+                if (deviceIdParts.Length != 8)
+                    throw new FormatException($"Invalid Device Id '{deviceId}'.");
+                
                 // 3	2	Yes	Unit identity	Byte(8)	Fixed identity of sending unit	E.g. MAC-address or similar.
-                writer.Write(new byte[] { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 });
+                for (var i = 0; i < 8; i++)
+                {
+                    writer.Write(Convert.ToByte(deviceIdParts[i], 16));
+                }               
 
                 // 4	10	Yes	Sequence number	UInt16	0-65535	See 4.2.1.
-                if (sequenceNumber == UInt16.MaxValue)
+                if (sequenceNumber == ushort.MaxValue)
                     sequenceNumber = 1;
 
                 writer.Write(sequenceNumber++);

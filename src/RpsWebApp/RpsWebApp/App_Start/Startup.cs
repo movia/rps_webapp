@@ -1,12 +1,9 @@
-﻿using Microsoft.Owin;
-using Owin;
+﻿using Owin;
 using System.Web.Http;
 using System.Net.Http.Formatting;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
 using RpsPositionWebApp.DataProviders.Rps;
-using System.Web.Hosting;
-using System.Threading.Tasks;
 using System.Threading;
 using Common.Logging;
 using Microsoft.Owin.BuilderProperties;

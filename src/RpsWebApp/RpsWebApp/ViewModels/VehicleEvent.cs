@@ -1,7 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Web;
 using Newtonsoft.Json;
 
 namespace RpsPositionWebApp.ViewModels
@@ -13,6 +10,12 @@ namespace RpsPositionWebApp.ViewModels
 
         [JsonProperty("vehicleId")]
         public string VehicleId { get; set; }
+
+        [JsonProperty("source", NullValueHandling = NullValueHandling.Ignore)]
+        public object Source { get; set; }
+
+        [JsonProperty("target", NullValueHandling = NullValueHandling.Ignore)]
+        public object Target { get; set; }
     }
 
     public class VehiclePositionEvent : VehicleEvent

@@ -17,18 +17,20 @@ namespace RpsPositionWebApp
     /// </summary>
     public class WsiProxyHandler : DelegatingHandler
     {
-        private UriBuilder baseUri = new UriBuilder("https://wsilb.moviatrafik.dk/");
+        private readonly UriBuilder baseUri;
+        private readonly HttpClient httpClient;
 
-        private HttpClient _HttpClient = new HttpClient();
+        public WsiProxyHandler()
+        {
+            baseUri = new UriBuilder("https://wsilb.moviatrafik.dk/");
+            httpClient = new HttpClient();
+        }
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
-            //Console.WriteLine(new HttpMessageContent(request).ReadAsStringAsync().Result);
-
-
             var newRequest = CreateNewRequest(request);
 
-            var t = _HttpClient.SendAsync(newRequest);
+            var t = httpClient.SendAsync(newRequest);
 
             await t;
 
@@ -37,15 +39,11 @@ namespace RpsPositionWebApp
                 try
                 {
                     var response = CreateNewResponse(t.Result);
-                    //Console.WriteLine("--->");
-                    //Console.WriteLine(new HttpMessageContent(response).ReadAsStringAsync().Result);
                     return response;
                 }
                 catch (Exception ex)
                 {
-                    //Console.WriteLine(ex.Message);
                     return new HttpResponseMessage(HttpStatusCode.InternalServerError) { Content = new StringContent(ex.Message) };
-
                 }
             }
             else
@@ -98,11 +96,9 @@ namespace RpsPositionWebApp
 
         private HttpContent TranslateContent(HttpContent httpContent)
         {
-            var mediatype = (httpContent.Headers != null && httpContent.Headers.ContentType != null) ? httpContent.Headers.ContentType.MediaType : null;
+            var mediatype = httpContent.Headers?.ContentType?.MediaType;
 
             return new StringContent(httpContent.ReadAsStringAsync().Result, Encoding.UTF8, mediatype);
         }
     }
-
-
 }

@@ -27,9 +27,17 @@ namespace RpsPositionWebApp
             vehicleAssignmentManager = VehicleAssignmentManager.Instance;
         }
 
+        public void SetEndpoint(string endpointAddress)
+        {
+            clientManager.ConnectedIds.Add(Context.ConnectionId);
+            var config = clientManager.GetConfiguration(Context.ConnectionId);
+            config["endpointAddress"] = endpointAddress;
+        }
+
         public void VehicleAssignment(VehicleAssignmentEvent vehicleAssignmentEvent)
         {            
             clientManager.ConnectedIds.Add(Context.ConnectionId);
+            vehicleAssignmentEvent.Source = Context.ConnectionId;
             vehicleEventQueue.Enqueue(vehicleAssignmentEvent);
 
             vehicleAssignmentManager.AssignVehicle(vehicleAssignmentEvent.VehicleId, vehicleAssignmentEvent.JourneyId);
@@ -38,6 +46,10 @@ namespace RpsPositionWebApp
         public void VehiclePosition(VehiclePositionEvent vehiclePositionEvent)
         {
             clientManager.ConnectedIds.Add(Context.ConnectionId);
+            var config = clientManager.GetConfiguration(Context.ConnectionId);
+
+            vehiclePositionEvent.Source = Context.ConnectionId;
+            vehiclePositionEvent.Target = config["endpointAddress"];
             vehicleEventQueue.Enqueue(vehiclePositionEvent);
         }
 

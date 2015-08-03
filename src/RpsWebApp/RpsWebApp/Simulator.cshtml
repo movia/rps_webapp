@@ -1,7 +1,12 @@
-﻿@{
+﻿@using RpsPositionWebApp.Data;
+@{
     Layout = "~/Views/Shared/_Layout.cshtml";
-    Page.Title = "Vehicle Player";
+    Page.Title = "Vehicle Simulator";
     Page.MobileAppCapable = true;
+
+    var config = ConfigurationManager.Instance.Configuration;
+    var endpointList = config.GetConfigurationSection("rpsEndpoints").GetConfigurationSections().Select(x => new SelectListItem() { Value = x.Value.Get("address"), Text = string.Format("{0} ({1})", x.Value.Get("name"), x.Value.Get("address")), Selected = x.Value.Get("name").StartsWith("Test") });
+    var vehicleList = config.GetConfigurationSection("vehicles").GetConfigurationSections().Select(x => new SelectListItem() { Value = x.Key, Text = x.Value.Get("label"), Selected = x.Key == "7169" });
 }
 
 @section AdditionalPageHead {
@@ -9,16 +14,15 @@
 }
 
 <div class="container">
-    <h3>Vehicle</h3>
+    <h3>Endpoint, Vehicle and Journey</h3>
+    <div class="form-group">
+        <label class="control-label">Endpoint:</label>
+        @Html.DropDownList("endpoint", endpointList, new { @class = "form-control" })
+    </div>
+    
     <div class="form-group">
         <label class="control-label">Vehicle:</label>
-        <select id="vehicleId" class="form-control">
-            <option value="7169">7169</option>
-            <option value="9031200002407190">9031200002407190 (Kruse)</option>
-            <option value="9031200002407191">9031200002407191 (Kruse)</option>
-            <option value="9031200000101300">9031200000101300 (Arriva)</option>
-            <option value="1300">1300 (Arriva)</option>
-        </select>
+        @Html.DropDownList("vehicleId", vehicleList, new { @class = "form-control" })
     </div>
 
     <div class="form-group">
@@ -37,14 +41,11 @@
             <label class="control-label">Current Position:</label>
             <input id="currentPositionIndex" class="form-control" value="0" />
         </div>
-
-        <button id="fixPositionDataButton" class="btn btn-default btn-xs">Autoformat</button>
     </div>
 
     <div id="status">
         <h3>Status</h3>
         <div id="map" style="height: 400px"></div>
-        <div id="info" class="alert alert-info"></div>
     </div>
 
     <h3>Tracking</h3>
@@ -78,9 +79,30 @@
     var popup;
     var marker;
 
-    function updateStatus() {
-        $('#info').empty();
+    function radians(n) {
+        return n * (Math.PI / 180);
+    }
+    function degrees(n) {
+        return n * (180 / Math.PI);
+    }
 
+    function getBearing(startLat, startLong, endLat, endLong) {
+        startLat = radians(startLat);
+        startLong = radians(startLong);
+        endLat = radians(endLat);
+        endLong = radians(endLong);
+
+        var dLong = endLong - startLong;
+
+        var dPhi = Math.log(Math.tan(endLat / 2.0 + Math.PI / 4.0) / Math.tan(startLat / 2.0 + Math.PI / 4.0));
+        if (Math.abs(dLong) > Math.PI) {
+            if (dLong > 0.0)
+                dLong = -(2.0 * Math.PI - dLong);
+            else
+                dLong = (2.0 * Math.PI + dLong);
+        }
+
+        return (degrees(Math.atan2(dLong, dPhi)) + 360.0) % 360.0;
     }
 
     function openConnection() {
@@ -90,21 +112,15 @@
         });
     }
 
-    function locationChanged(p) {
-        position = p;
-
-        if (lines == null)
-            updateLine();
-
-        showPosition();
-    }
-
     function startTracking() {
 
         console.info('Starting tracking ...')
 
         if (trackHandle != null)
             clearInterval(trackHandle);
+
+        endpointAddress = $('#endpoint').val();
+        vehicleEventsProxy.server.setEndpoint(endpointAddress);
 
         vehicleId = $('#vehicleId').val();
         journeyId = $('#journeyId').val();
@@ -170,12 +186,13 @@
 
         console.info('Converted input data', data);
 
-
         trackHandle = setInterval(track, 1000);
 
-        /* Update UI */
+        /* Update UI */        
         $('#startTrackingButton').prop('disabled', true);
         $('#stopTrackingButton').prop('disabled', false);
+        $('#endpoint').prop('disabled', true);
+        $('#vehicleId').prop('disabled', true);
         $('#journeyId').prop('disabled', true);
         $('#input').hide();
         $('#status').show();
@@ -194,6 +211,8 @@
         /* Update UI */
         $('#startTrackingButton').prop('disabled', false);
         $('#stopTrackingButton').prop('disabled', true);
+        $('#endpoint').prop('disabled', false);
+        $('#vehicleId').prop('disabled', false);
         $('#journeyId').prop('disabled', false);
         $('#input').show();
         $('#status').hide();
@@ -207,6 +226,7 @@
         }
 
         var speed = 0;
+        var direction = 0;
         var row = data[currentPositionIndex];
         var latlng = L.latLng(row.lat, row.lng);
         marker.setLatLng(latlng)
@@ -215,6 +235,8 @@
             var prevRow = data[currentPositionIndex - 1];
             var prevLatlng = L.latLng(prevRow.lat, prevRow.lng);
             speed = prevLatlng.distanceTo(latlng);
+            
+            direction = getBearing(prevRow.lat, prevRow.lng, row.lat, row.lng);
         }
 
         var vehiclePosition = {
@@ -224,7 +246,7 @@
             lng: row.lng,
             accuracy: 5,
             speed: speed,
-            direction: 270
+            direction: direction
         };
         console.info('Tracking event occured:', vehiclePosition);
         vehicleEventsProxy.server.vehiclePosition(vehiclePosition);
@@ -270,14 +292,6 @@
         marker = L.marker([0, 0]).addTo(map);;
 
         vehicleEventsProxy = $.connection.vehicleEvents
-
-        $('#fixPositionDataButton').click(function () {            
-            var fixed = $('#positionData').val();
-            fixed = fixed.replace(/,/g, '.');
-            fixed = fixed.replace(/\t/g, ',');
-            console.log(fixed);
-            $('#positionData').val(fixed);
-        });
 
         $.extend(vehicleEventsProxy.client, {
             someMethod: function () { }
