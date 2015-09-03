@@ -1,7 +1,12 @@
-﻿@{
+﻿@using RpsPositionWebApp.Data;
+@{
     Layout = "~/Views/Shared/_Layout.cshtml";
     Page.Title = "Vehicle Test Client";
     Page.MobileAppCapable = true;
+
+    var config = ConfigurationManager.Instance.Configuration;
+    var endpointList = config.GetConfigurationSection("rpsEndpoints").GetConfigurationSections().Select(x => new SelectListItem() { Value = x.Value.Get("address"), Text = string.Format("{0} ({1})", x.Value.Get("name"), x.Value.Get("address")), Selected = x.Value.Get("name").StartsWith("Production S") });
+    var vehicleList = config.GetConfigurationSection("vehicles").GetConfigurationSections().Select(x => new SelectListItem() { Value = x.Key, Text = x.Value.Get("label"), Selected = x.Key == "7169" });
 }
 
 @section AdditionalPageHead {
@@ -10,13 +15,15 @@
 }
 
 <div class="container">
-    <h3>Vehicle</h3>
+    
+    <h3>Endpoint and Vehicle</h3>
+    <div class="form-group">
+        <label class="control-label">Endpoint:</label>
+        @Html.DropDownList("endpoint", endpointList, new { @class = "form-control" })
+    </div>
     <div class="form-group">
         <label class="control-label">Vehicle:</label>
-        <select id="vehicleId" class="form-control">
-            <option value="7169">7169</option>
-            <option value="9031200002407190">7190</option>
-        </select>
+        @Html.DropDownList("vehicleId", vehicleList, new { @class = "form-control" })
     </div>
 
     <h3>Journey</h3>
@@ -57,6 +64,7 @@
     var vehicleEventsProxy = null;
     var watchHandle = null;
     var trackHandle = null;
+    var endpointAddress = null;
     var vehicleId = null;
     var position = null;
     var lines = null;
@@ -162,6 +170,9 @@
 
         if (trackHandle != null)
             clearInterval(trackHandle);
+
+        endpointAddress = $('#endpoint').val();
+        vehicleEventsProxy.server.setEndpoint(endpointAddress);
 
         vehicleId = $('#vehicleId').val();
         journeyId = $('#journeyId').val();
